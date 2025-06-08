@@ -12,8 +12,15 @@ import os
 import httpx
 from flask_cors import CORS
 import traceback
+import logging
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+from url_api_search import get_url_by_name,read_json_file
 
-client = MongoClient("mongodb+srv://user:pwd@cluster0.qq2ou.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+# Initialize logging
+logging.basicConfig(level=logging.INFO) 
+logger = logging.getLogger(__name__)
+client = MongoClient("mongodb+srv://stark-123:pwd@cluster0.qq2ou.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
 db = client['PINELABS_DOC']
 collection = db['documentation_context'] 
 model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2') 
@@ -30,6 +37,62 @@ client = OpenAI(
 def get_embeddings(text):
     embeddings = model.encode(text)
     return embeddings.tolist()  
+
+def save_embeddings_to_file(embeddings_dict, filename="endpoint_embeddings.json"):
+    # Save embeddings dictionary {endpoint_name: embedding_list} to JSON file
+    with open(filename, "w", encoding="utf-8") as f:
+        json.dump(embeddings_dict, f) 
+
+def find_api_data(query):
+    endpoints = [
+        "Generate Token",
+        "Payment Option PBP",
+        "Create Order",
+        "Fetch Order",
+        "Create Payment Card",
+        "Create Payment UPI",
+        "Create Payment Netbanking",
+        "Create Payment PBP",
+        "Capture Payment",
+        "Cancel Payment",
+        "Create Refund",
+        "OHS details"
+    ] 
+
+    # Load precomputed embeddings
+    with open("endpoint_embeddings.json", "r") as f:
+        endpoint_vecs_dict = json.load(f) 
+
+    # Ensure all endpoints embeddings are present
+    missing = [ep for ep in endpoints if ep not in endpoint_vecs_dict]
+    if missing:
+        raise ValueError(f"Missing embeddings for endpoints: {missing}")
+
+    # Convert loaded embeddings (lists) to numpy arrays
+    endpoint_vecs = np.array([np.array(endpoint_vecs_dict[ep]) for ep in endpoints])
+
+    # Compute query embedding
+    query_vec = np.array(get_embeddings(query)).reshape(1, -1)  # reshape for sklearn
+
+    # Compute cosine similarity between query and all endpoint embeddings
+    similarities = cosine_similarity(query_vec, endpoint_vecs)[0]
+
+    # Get indices of top 2 matches
+    top_indices = similarities.argsort()[-2:][::-1]
+
+    # Get the top 2 endpoint names
+    top_matches = [endpoints[i] for i in top_indices]
+
+    # Read your API collection json
+    collection = read_json_file(r"C:\Users\MuraliB\Desktop\pl_online_hackathon_2025\API Collection.json") 
+
+    url_1 = get_url_by_name(collection, top_matches[0])
+    url_2 = get_url_by_name(collection, top_matches[1]) 
+
+    return [url_1, url_2] if url_1 and url_2 else []
+    
+
+
 
 def find_similar_chunks(query_text, limit=10):
     query_embedding = get_embeddings(query_text)  # returns a 384-dim list
@@ -76,21 +139,27 @@ def append_file_contents(filenames, search_root):
                         content = f.read()
                         appended_text.append(f"\n---\n# {file}\n{content}")
                 except Exception as e:
-                    print(f"⚠️ Failed to read {file_path}: {e}")
+                    print(f"⚠ Failed to read {file_path}: {e}")
 
     return "\n".join(appended_text) 
 
 
+
+
+
 def generate_response(query) -> str:
+    urls = find_api_data(query)
+    logger.info(f"Found URLs: {urls}")
     context_meta_data = find_similar_chunks(query) 
-    # context_meta_data is a list of fielnames each file is a documentation for developers. now i need to append it in response please refer here for additional details  
-    for name in context_meta_data:
-        formatted.append(f"• {name}")
-
+    formatted = []
     formatted.append("\n🧾 Extracted Documentation Content:\n")
-    formatted.append(raw_text)
+    for name in context_meta_data:
+        formatted.append(f"- {name}")  # using bullet point + inline code
 
-    return "\n".join(formatted)
+    markdown_string = "\n".join(formatted)
+ 
+    reference = markdown_string
+
     context_data = append_file_contents(context_meta_data, r"C:\Users\MuraliB\Desktop\pl_online_hackathon_2025\Integration Docs\export-project__01973fdf-b0b2-7c67-9b9a-03d534689017\v3.0")
 
     try:
@@ -103,11 +172,13 @@ def generate_response(query) -> str:
         "Use the documentation along with your technical expertise and prior knowledge to provide "
         "a clear, accurate, and helpful response.\n\n" \
         "Keep your responses concise, focused on the query, and avoid unnecessary details. "
+        "Provide output in markdown format only" 
         )
 
         user_prompt = (
         f"Developer Query:\n{query}\n\n"
         f"Documentation Context:\n{context_data}"
+        f"Relvant API Endpoints:\n{urls}\n\n"
         )
 
         response = client.chat.completions.create(
@@ -121,7 +192,7 @@ def generate_response(query) -> str:
         )
         try:
             result = response.choices[0].message.content.strip()
-            return result
+            return result,reference
         except Exception as e:
             raise Exception(f"OpenAI parsing failed: {str(e)}")
 
@@ -137,13 +208,14 @@ CORS(app)
 def generate_prompt():
     try:
         data = request.get_json()
+
         if not data or 'query' not in data:
             return jsonify({"error": "Missing 'query' in request body"}), 400
 
         query = data['query']
-        prompt = generate_response(query) 
+        prompt,reference = generate_response(query) 
 
-        return jsonify({"prompt": prompt}), 200
+        return jsonify({"prompt": f"{prompt + reference}"}), 200
 
     except Exception as e:
         traceback.print_exc()
@@ -151,4 +223,4 @@ def generate_prompt():
     
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(host='0.0.0.0', debug=True, port=5000)
