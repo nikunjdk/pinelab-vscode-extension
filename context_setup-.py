@@ -7,7 +7,7 @@ import random
 from sentence_transformers import SentenceTransformer
 import json 
 
-client = MongoClient("mongodb+srv://stark-123:stark-123@cluster0.qq2ou.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+client = MongoClient("mongodb+srv://stark-123:@cluster0.qq2ou.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
 db = client['PINELABS_DOC']
 collection = db['documentation_context'] 
 model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2') 
