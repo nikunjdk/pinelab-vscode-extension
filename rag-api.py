@@ -13,7 +13,7 @@ import httpx
 from flask_cors import CORS
 import traceback
 
-client = MongoClient("mongodb+srv://stark-123:stark-123@cluster0.qq2ou.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+client = MongoClient("mongodb+srv://user:pwd@cluster0.qq2ou.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
 db = client['PINELABS_DOC']
 collection = db['documentation_context'] 
 model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2') 
