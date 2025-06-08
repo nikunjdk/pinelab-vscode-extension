@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chat with LLM</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 10px; }
+    #chat { height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; }
+    #input { width: 100%; padding: 5px; }
+    .msg { margin: 10px 0; }
+    .user { color: blue; }
+    .bot { color: green; }
+    .msg.bot pre {
+    background: #f4f4f4;
+    padding: 8px;
+    border-radius: 4px;
+    overflow-x: auto;
+  }
+  .msg.bot code {
+    background: #eee;
+    padding: 2px 4px;
+    border-radius: 3px;
+  }
+  </style>
+</head>
+<body>
+  <div id="chat"></div>
+  <input id="input" placeholder="Type your question..." />
+  <script>
+    const vscode = acquireVsCodeApi();
+    const input = document.getElementById('input');
+    const chat = document.getElementById('chat');
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const message = input.value.trim();
+        if (!message) return;
+        appendMessage('You', message, 'user');
+        vscode.postMessage({ type: 'query', text: message });
+        input.value = '';
+      }
+    });
+
+    window.addEventListener('message', (event) => {
+      const { type, text } = event.data;
+      if (type === 'response') {
+        appendMessage('Bot', text, 'bot');
+      }
+    });
+
+    function appendMessage(sender, message, cls) {
+  const div = document.createElement('div');
+  div.className = `msg ${cls}`;
+  if (cls === 'bot') {
+    // Convert markdown to HTML for bot messages
+    div.innerHTML = `<strong>${sender}:</strong><br>${marked.parse(message)}`;
+  } else {
+    div.textContent = `${sender}: ${message}`;
+  }
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+  </script>
+</body>
+</html>
