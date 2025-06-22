@@ -1,0 +1,51 @@
+# Node modules
+node_modules/
+ignition/
+.env
+.env.*
+meta-data.json
+# Hardhat files
+/cache
+/artifacts
+nvm-setup.exe
+nvm-setup.zip 
+secret.json
+# TypeChain files
+/typechain
+/typechain-types
+
+# solidity-coverage files
+/coverage
+/coverage.json
+
+# Hardhat Ignition default folder for deployments against a local node
+ignition/deployments/chain-31337
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build output
+dist/
+build/
+out/
+
+# Test & temp files
+*.tsbuildinfo
+*.log
+*.tmp
+*.temp
+
+#
